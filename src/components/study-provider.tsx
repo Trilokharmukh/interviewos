@@ -72,7 +72,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     [],
   );
   const loadAccount = useCallback(
-    async (user: Account | null) => {
+    async (user: Account | null, acceptCloud = false) => {
       // Flush the current device snapshot before switching accounts.
       try {
         if (hydrated)
@@ -129,6 +129,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(baseKey, remote.current);
         cloud.current = true;
         if (
+          !acceptCloud &&
           unsynced &&
           result.data &&
           JSON.stringify(data) !== JSON.stringify(local)
@@ -278,7 +279,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       JSON.stringify(current.current),
     );
     localStorage.removeItem(storageKey.current + ":synced");
-    await loadAccountRef.current(account);
+    await loadAccountRef.current(account, true);
   }, [account]);
   const importDevice = useCallback(() => {
     try {

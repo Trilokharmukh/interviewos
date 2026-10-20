@@ -1871,10 +1871,9 @@ main {
 }
 .tracker-row {
   display: grid;
-  grid-template-columns: minmax(210px, 2.2fr) minmax(85px, 0.8fr) minmax(
-      125px,
-      1fr
-    ) minmax(80px, 0.7fr) 30px;
+  grid-template-columns:
+    minmax(210px, 2.2fr) minmax(85px, 0.8fr) minmax(125px, 1fr)
+    minmax(80px, 0.7fr) 30px;
   align-items: center;
   gap: 15px;
   padding: 17px 23px;

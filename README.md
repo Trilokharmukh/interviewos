@@ -67,7 +67,7 @@ npx playwright install chromium
 npx playwright test
 ```
 
-GitHub Actions runs the checks, production build, and desktop/mobile browser tests without production credentials. API unit tests intentionally run in device mode. Live PostgreSQL/account flows require the configured database and migration and must be verified after connection.
+GitHub Actions runs the checks, production build, and desktop/mobile browser tests without production credentials. API unit tests intentionally run in device mode. A separate CI job provisions disposable PostgreSQL 17, applies the real auth/study migrations, and verifies account creation, session cookies, private account data, independent users, stale-write rejection, input validation, origin checks, invalid login, and sign-out revocation. Production Neon connectivity still needs verification after connection.
 
 ## Deployment
 

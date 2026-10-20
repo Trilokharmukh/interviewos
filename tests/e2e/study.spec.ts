@@ -85,3 +85,88 @@ test("dashboard and library fit the viewport without horizontal overflow", async
     ).toBeTruthy();
   }
 });
+
+test("cloud conflicts keep the local copy and can accept cloud progress without looping", async ({
+  page,
+}) => {
+  const empty = {
+    progress: {},
+    notes: {},
+    quiz: {},
+    studyLog: [],
+    reminders: [],
+    activity: [],
+    revisions: [],
+    daily: { enabled: false, time: "20:00", lastFired: "" },
+  };
+  const device = {
+    ...empty,
+    notes: { closures: "Unsynced device explanation" },
+  };
+  const cloud = { ...empty, notes: { closures: "Newer cloud explanation" } };
+  await page.addInitScript(
+    ({ device, empty }) => {
+      localStorage.setItem(
+        "interviewos-v4-account:conflict-test",
+        JSON.stringify(device),
+      );
+      localStorage.setItem(
+        "interviewos-v4-account:conflict-test:synced",
+        JSON.stringify(empty),
+      );
+    },
+    { device, empty },
+  );
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      json: { status: "ok", storage: "postgresql", accounts: true },
+    }),
+  );
+  await page.route("**/api/auth/get-session**", (route) =>
+    route.fulfill({
+      json: {
+        user: {
+          id: "conflict-test",
+          name: "Test Learner",
+          email: "test@example.test",
+          emailVerified: false,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+        session: {
+          id: "session",
+          token: "test-session",
+          userId: "conflict-test",
+          expiresAt: "2030-01-01T00:00:00Z",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      },
+    }),
+  );
+  await page.route("**/api/study", (route) =>
+    route.fulfill({ json: { data: cloud, version: 2 } }),
+  );
+  await page.goto("/settings");
+  await expect(
+    page.getByRole("button", { name: "Reload cloud progress", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Reload cloud progress", exact: true })
+    .click();
+  await expect(
+    page.getByText("Your cloud progress is up to date."),
+  ).toBeVisible();
+  const copies = await page.evaluate(() => ({
+    current: JSON.parse(
+      localStorage.getItem("interviewos-v4-account:conflict-test")!,
+    ),
+    recovery: JSON.parse(
+      localStorage.getItem(
+        "interviewos-v4-account:conflict-test:conflict-backup",
+      )!,
+    ),
+  }));
+  expect(copies.current.notes.closures).toBe("Newer cloud explanation");
+  expect(copies.recovery.notes.closures).toBe("Unsynced device explanation");
+});
