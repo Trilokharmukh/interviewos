@@ -1,0 +1,526 @@
+/* InterviewOS extended learning chapters. Original, interview-oriented teaching content.
+   These augment — rather than replace — the core lesson and its saved progress. */
+window.INTERVIEWOS_DEEP_DIVES = {
+  'execution-context': {
+    intro: 'JavaScript does not run a function without preparation. It first creates an execution context, prepares its bindings, then executes the body. The call stack keeps track of the active contexts.',
+    chapters: [
+      {heading:'1. What JavaScript prepares before your first line', paragraphs:[
+        'Imagine a restaurant. Before customers arrive, staff label the tables and prepare the kitchen. Similarly, JavaScript prepares its execution environment before running statements.',
+        'A global execution context is created when your script starts. When a regular function is called, a new function execution context is created. Each one has its own variable environment, access to outer lexical environments, and a this binding (subject to function type and mode).',
+        'An execution context is not the same thing as the call stack. The context describes the environment needed to execute code; the stack tracks which context is currently active.'
+      ], code:`var city = 'Mumbai';
+function showCity() {
+  const message = 'Hello ' + city;
+  console.log(message);
+}
+showCity();
+// Hello Mumbai`, steps:['Global context is created; the showCity declaration is available.','Global execution assigns city = "Mumbai".','Calling showCity creates its own context on the stack.','showCity looks up city in its outer environment and prints the result.','showCity returns and its context leaves the stack.']},
+      {heading:'2. Creation phase vs execution phase', paragraphs:[
+        'Creation phase: register declarations and prepare environments. A var binding starts as undefined. A function declaration is generally initialized to its function. let and const bindings exist, but stay uninitialized until their declaration is evaluated.',
+        'Execution phase: evaluate statements in order. Assignments happen now. Encountering a let or const declaration initializes that binding. Accessing it earlier in its scope throws a ReferenceError because it is in the Temporal Dead Zone.',
+        'Important interview distinction: JavaScript does not literally move your declarations to the top. “Hoisting” is a convenient way to describe the observable behavior of declaration processing.'
+      ], code:`console.log(score); // undefined
+sayHello();        // Hello
+// console.log(level); // ReferenceError (TDZ)
+
+var score = 10;
+let level = 2;
+function sayHello() { console.log('Hello'); }`, steps:['Creation: score = undefined; sayHello is initialized; level is uninitialized.','Execution: console.log(score) prints undefined.','sayHello() can run before the declaration line.','If you uncomment console.log(level), a ReferenceError occurs.','Executing let level = 2 initializes level.']},
+      {heading:'3. Trace nested calls like an interviewer', paragraphs:[
+        'The stack is LIFO: last in, first out. The global context stays below the functions it invokes. A function pauses at a nested call, waits for that call to return, then continues on the next statement.',
+        'Think about both the printed output and the changing stack. Interviewers often ask you to draw the stack after a particular call.'
+      ], code:`function third() { console.log('C'); }
+function second() {
+  console.log('B');
+  third();
+  console.log('D');
+}
+function first() {
+  console.log('A');
+  second();
+  console.log('E');
+}
+first();
+// A B C D E`, steps:['Stack = [global]. first() called → [global, first]. Print A.','second() called → [global, first, second]. Print B.','third() called → [global, first, second, third]. Print C.','third returns → [global, first, second]. Print D.','second returns → [global, first]. Print E.','first returns → [global].']},
+      {heading:'4. Recursion and stack overflow', paragraphs:[
+        'Recursion means a function calls itself. Each active call has a separate execution context, including its own parameters and local bindings.',
+        'If there is no terminating condition—or nesting is too deep—the stack runs out of room. The error is commonly RangeError: Maximum call stack size exceeded in browsers.',
+        'Async callbacks do not remain on the call stack while waiting. The callback executes later, in a new call stack turn, when the event loop schedules it.'
+      ], code:`function factorial(n) {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+console.log(factorial(3)); // 6
+// factorial(3) waits for factorial(2), which waits for factorial(1).`, steps:['Call factorial(3).','Push factorial(2).','Push factorial(1), which returns 1.','factorial(2) returns 2 * 1 = 2.','factorial(3) returns 3 * 2 = 6.']}
+    ], visual:{title:'Call stack during nested execution',frames:[
+      {caption:'Script begins',stack:['Global'],detail:'Only the global execution context exists.'},
+      {caption:'first() starts',stack:['Global','first()'],detail:'first() is pushed, logs A, and calls second().'},
+      {caption:'second() starts',stack:['Global','first()','second()'],detail:'second() logs B, then calls third().'},
+      {caption:'third() starts',stack:['Global','first()','second()','third()'],detail:'third() is now on top and logs C.'},
+      {caption:'third() returned',stack:['Global','first()','second()'],detail:'Execution continues inside second(), which logs D.'},
+      {caption:'second() returned',stack:['Global','first()'],detail:'Execution continues inside first(), which logs E.'},
+      {caption:'Everything returned',stack:['Global'],detail:'No called functions remain on the stack.'}
+    ]},
+    pitfalls:['Confusing a lexical environment with the call stack.','Thinking a function declaration is executed merely because it is defined.','Claiming let and const are “not hoisted” without explaining their uninitialized bindings.'],
+    questions:[{q:'Does an arrow function create a separate this binding?',a:'No. Arrow functions capture this lexically rather than creating their own this binding.'},{q:'Why can synchronous recursion block the page?',a:'Each call stays on the JavaScript stack and occupies the main thread until it finishes; rendering and events cannot run while that synchronous work is active.'}],
+    say:'JavaScript first prepares an execution context, then executes its statements. Global code creates a global context, each function call creates a new function context, and the call stack runs them in LIFO order. I can trace nested calls by showing which context is pushed and popped at every step.'
+  },
+  scope: {
+    intro:'Scope tells JavaScript where a name can be accessed. Lexical scope means that name lookup follows where the function is written, not where it is called.',
+    chapters:[
+      {heading:'1. Global, function, and block scope',paragraphs:[
+        'Global scope: names declared in the outer script/module scope. In modern JavaScript, top-level module declarations do not automatically become properties on window.',
+        'Function scope: parameters and var declarations inside a function belong to that function. A var declared in an if block is still visible inside the surrounding function.',
+        'Block scope: let, const, and class declarations are scoped to the nearest enclosing block (for example if, for, or a pair of braces).'
+      ],code:`function test() {
+  if (true) {
+    var a = 10;
+    let b = 20;
+    const c = 30;
+  }
+  console.log(a); // 10
+  // console.log(b); // ReferenceError
+  // console.log(c); // ReferenceError
+}
+test();`,steps:['Entering test creates function scope.','var a belongs to test, not the if block.','let b and const c belong to the if block.','Outside the block, a is available; b and c are not.']},
+      {heading:'2. How lexical lookup actually works',paragraphs:[
+        'Every lexical environment has a record of its local bindings and a reference to an outer environment. JavaScript resolves a variable by checking the current environment, then following outer references until it finds a match or reaches the end.',
+        'The outer environment is chosen from the function definition location. Moving a function into another object or passing it to a different function does not relocate its lexical scope.'
+      ],code:`const city = 'Mumbai';
+function outer() {
+  const city = 'Pune';
+  function inner() { console.log(city); }
+  return inner;
+}
+function execute(fn) {
+  const city = 'Delhi';
+  fn();
+}
+execute(outer()); // Pune`,steps:['inner was defined inside outer.','The immediate lexical outer scope of inner is outer.','execute has a local city, but it is NOT inner’s lexical parent.','inner resolves city from outer and prints Pune.']},
+      {heading:'3. Shadowing and TDZ gotchas',paragraphs:[
+        'Shadowing happens when the inner scope defines the same identifier as an outer scope. Name lookup stops at the closest matching binding.',
+        'A subtle trap: an inner let binding also shadows the outer variable during its TDZ. JavaScript does not skip the uninitialized local binding and fall back to the outer one.',
+        'Redeclaring a let variable in the same lexical scope is a syntax error, whereas shadowing it in a separate nested scope is allowed.'
+      ],code:`let count = 5;
+function example() {
+  // console.log(count); // ReferenceError, NOT 5
+  let count = 10;
+  console.log(count); // 10
+}
+example();
+console.log(count); // 5`,steps:['The inner count declaration creates an inner binding for the whole function scope.','Before let count = 10 executes, that binding is uninitialized.','After initialization, example prints 10.','Global count is still 5.']},
+      {heading:'4. Common interview question: var inside a loop',paragraphs:[
+        'var creates one function-scoped loop variable shared by every delayed callback. let in a for loop creates a distinct per-iteration binding for closures.',
+        'The timers do not execute until the current synchronous work finishes. By then var i has become 3.'
+      ],code:`for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log('var', i), 0);
+}
+for (let j = 0; j < 3; j++) {
+  setTimeout(() => console.log('let', j), 0);
+}
+// var 3, var 3, var 3, let 0, let 1, let 2`,steps:['Both loops finish synchronously first.','All var callbacks read the one shared i, now 3.','Each let callback closes over its own iteration j.','The queued callbacks run later in registration order.']}
+    ],visual:{title:'How JavaScript resolves a variable',frames:[{caption:'inner reads city',stack:['inner scope'],detail:'First check inner’s own bindings; no city found.'},{caption:'Check defining parent',stack:['outer scope','inner scope'],detail:'The outer function contains city = "Pune".'},{caption:'Found the nearest binding',stack:['outer scope: city = Pune','inner scope'],detail:'Return Pune; do not continue to global city or execute() local variables.'}]},
+    pitfalls:['Saying var is block-scoped.','Mistaking lexical scope for a function’s call location.','Forgetting that an inner let in TDZ still shadows an outer let.'],
+    questions:[{q:'What happens when a variable cannot be resolved?',a:'Reading an undeclared identifier throws ReferenceError (apart from special cases such as typeof on an unresolved identifier).'}, {q:'What is the key difference between scope and closure?',a:'Scope describes where a binding can be resolved; a closure is a function retaining access to its lexical environment after being passed or returned.'}],
+    say:'Scope determines where a variable is available. JavaScript uses lexical scope: variable lookup follows the environment where the function was defined, not the caller. let and const are block-scoped, var is function-scoped, and the closest binding wins through shadowing.'
+  },
+  closures:{
+    intro:'A closure is a function together with its surrounding lexical environment. It gives a callback continued access to variables from its defining scope, even after its outer function finishes.',
+    chapters:[
+      {heading:'1. The easiest closure: a private counter',paragraphs:[
+        'Think of a function as carrying a key to a private locker. The outer function finishes, but the returned inner function still knows how to access the locker.',
+        'Closure values are not frozen copies of variables. The inner function accesses bindings. If the captured variable changes, future calls can see its new value.',
+        'Every separate call to createCounter normally creates a separate environment, so counters do not interfere with each other.'
+      ],code:`function createCounter() {
+  let count = 0;
+  return function increment() {
+    count += 1;
+    return count;
+  };
+}
+const first = createCounter();
+const second = createCounter();
+console.log(first());  // 1
+console.log(first());  // 2
+console.log(second()); // 1`,steps:['Call createCounter(); create a new count = 0 binding.','Return increment, which closes over that binding.','Calling first() changes its count to 1 and then 2.','A second invocation created a different count, so second() returns 1.']},
+      {heading:'2. Practical use: once() and private state',paragraphs:[
+        'Closures are useful when state must persist between calls without being exposed globally. A once wrapper remembers whether the original function already ran.',
+        'This technique appears in event handlers, initialization code, module factories, and memoization. You should still consider when state should instead live in a React hook, reducer, or centralized store.'
+      ],code:`function once(fn) {
+  let called = false;
+  let result;
+  return function (...args) {
+    if (!called) {
+      called = true;
+      result = fn.apply(this, args);
+    }
+    return result;
+  };
+}
+const initialize = once(() => 'Initialized');
+console.log(initialize()); // Initialized
+console.log(initialize()); // Initialized (same result)`,steps:['once receives the original function and creates called = false.','First call marks it as called and stores the result.','Future calls skip fn and reuse the stored result.','The wrapper retains called and result through its closure.']},
+      {heading:'3. Debouncing in a real search box',paragraphs:[
+        'Debounce waits until a burst of calls has stopped for a specified delay. The closure keeps the pending timer ID so the next keystroke can cancel it.',
+        'In production, consider adding a cancel method and cleanup when a component unmounts to avoid work that is no longer needed.'
+      ],code:`function debounce(fn, delay) {
+  let timerId;
+  return function (...args) {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+const search = debounce(query => console.log('API:', query), 300);
+search('re');
+search('rea');
+search('react');
+// If no new call occurs for 300ms: API: react`,steps:['Call with re and start timer A.','Call with rea: cancel A and start timer B.','Call with react: cancel B and start timer C.','If 300ms passes with no new call, execute C with react.']},
+      {heading:'4. React stale closures and memory implications',paragraphs:[
+        'Each React render creates fresh closures over that render’s state and props. An async callback or effect can continue referencing an earlier render’s values. That is the stale-closure problem.',
+        'A closure does not automatically cause a memory leak. But a listener, timer, subscription, or other long-lived reference can keep captured objects reachable, so cleaning up retained callbacks matters.',
+        'Use functional state updates for updates based on previous state, and include correct effect dependencies or deliberately manage current values with a ref.'
+      ],code:`// React example: use previous state, not a stale captured number
+function Counter() {
+  const [count, setCount] = React.useState(0);
+  function addLater() {
+    setTimeout(() => {
+      setCount(prev => prev + 1);
+    }, 1000);
+  }
+  return <button onClick={addLater}>{count}</button>;
+}`,steps:['A render creates addLater and closes over its current values.','setTimeout stores the callback for later.','Using prev => prev + 1 asks React for the latest previous state.','This avoids incrementing from an obsolete captured count.']}
+    ], visual:{title:'Counter closure survives the outer call',frames:[{caption:'createCounter() runs',stack:['createCounter()','count = 0'],detail:'A new lexical environment is created.'},{caption:'Outer function returns',stack:['increment closure','count = 0'],detail:'The increment function still references its original environment.'},{caption:'First click',stack:['increment closure','count = 1'],detail:'Increment modifies the captured binding.'},{caption:'Second click',stack:['increment closure','count = 2'],detail:'The same binding is used again.'}]},
+    pitfalls:['Thinking a closure stores only an immutable snapshot of every variable.','Assuming returning a function automatically leaks memory.','Ignoring stale closures in effects and timers.'],
+    questions:[{q:'Why does the var loop log 3 three times?',a:'All callbacks close over the same function-scoped var binding, and read its final value when executed.'},{q:'Can closure state be garbage collected?',a:'Yes. When no reachable references can access the closure/environment, the relevant values are eligible for garbage collection.'}],
+    say:'A closure is a function plus access to the lexical environment where it was defined. I use closures for private state, debounce, once-only initialization, and callbacks. They capture bindings, not simply frozen values, so I pay attention to stale closures and retained listeners.'
+  },
+  hoisting:{
+    intro:'Hoisting is a useful name for the fact that JavaScript prepares declarations before executing statements. The important interview skill is predicting the different behavior of var, let, const, function declarations, and expressions.',
+    chapters:[
+      {heading:'1. Compare declarations before their line',paragraphs:[
+        'var: binding exists and is initialized to undefined during context creation. Reading it before assignment prints undefined.',
+        'let / const: bindings exist from the start of their scope, but remain uninitialized until their declaration executes. Reading them early throws ReferenceError (TDZ).',
+        'Function declarations: ordinarily fully initialized before execution, so they can be called earlier in that scope. Function expressions follow the rules of the variable holding them.'
+      ],code:`console.log(a);      // undefined
+// console.log(b);   // ReferenceError
+// console.log(c);   // ReferenceError
+sayHi();             // Hi
+// sayBye();         // TypeError (undefined is not a function)
+var a = 1;
+let b = 2;
+const c = 3;
+function sayHi() { console.log('Hi'); }
+var sayBye = function () { console.log('Bye'); };`,steps:['Creation phase: a and sayBye are initialized to undefined.','b and c are created but left uninitialized.','sayHi binding holds the declared function.','Calling sayBye before assignment would attempt to call undefined, causing TypeError.']},
+      {heading:'2. TDZ starts when the scope starts',paragraphs:[
+        'TDZ is not a specific number of lines. It lasts from entry into a lexical scope until execution reaches the declaration that initializes the binding.',
+        'Shadowing matters: the engine sees the inner lexical declaration even before it is initialized. It does not fall back to the outer variable.'
+      ],code:`const status = 'outside';
+function check() {
+  // console.log(status); // ReferenceError
+  const status = 'inside';
+  console.log(status);     // inside
+}
+check();`,steps:['Entering check creates its local status binding.','The local status shadows the outer status immediately.','Before the const line, the local binding is in TDZ.','Executing const status initializes it and logs inside.']},
+      {heading:'3. Function declarations vs arrow expressions',paragraphs:[
+        'Calling a function declaration before its position usually works. Calling an arrow function assigned to const before initialization gives ReferenceError.',
+        'A function expression assigned to var is different again: reading the binding gives undefined, so invoking it before assignment gives TypeError.',
+        'Block-level function declarations have nuanced behavior in old sloppy-mode scripts; use the modern strict/module model in interview examples.'
+      ],code:`work(); // Works
+function work() { console.log('Works'); }
+
+// run(); // ReferenceError
+const run = () => console.log('Runs');
+run(); // Runs`,steps:['work is initialized as a declaration during scope setup.','run exists as an uninitialized const until its line executes.','After initialization, run is a function value and can be called.']},
+      {heading:'4. A compact prediction table',paragraphs:[
+        'For interview output questions, first mark every declaration in the current scope. Next separate initialization from assignment. Finally execute line by line.',
+        'Do not memorize “hoisted or not hoisted” as a binary statement; explain whether the binding is initialized and what happens on access.'
+      ],code:`// Read BEFORE each declaration:
+// var x        → undefined
+// let y        → ReferenceError
+// const z      → ReferenceError
+// function f()  → callable function
+// var g = fn   → undefined; calling gives TypeError
+// const h = fn → ReferenceError`,steps:['Identify the scope.','Register declarations as the scope is created.','Assign var initial values and function declarations.','Run statements; initialize lexical bindings only when their declaration is evaluated.']}
+    ],visual:{title:'What exists before code executes',frames:[{caption:'Creation starts',stack:['Scope entered'],detail:'The engine builds the environment record.'},{caption:'var initialized',stack:['var a = undefined'],detail:'Reading a before its assignment returns undefined.'},{caption:'let and const reserved',stack:['let b = <uninitialized>','const c = <uninitialized>'],detail:'Reading these early throws ReferenceError.'},{caption:'Function declaration ready',stack:['function work() = function'],detail:'A normal function declaration can be called.'},{caption:'Execution reaches declarations',stack:['a = 1','b = 2','c = 3'],detail:'Assignments and lexical initialization now happen.'}]},
+    pitfalls:['Saying let / const are never considered during creation.','Claiming let and const start with undefined.','Confusing ReferenceError (TDZ) with TypeError (calling undefined).'],
+    questions:[{q:'What does typeof do on a TDZ variable?',a:'typeof on an uninitialized lexical binding throws ReferenceError; typeof on a truly unresolved identifier returns "undefined".'},{q:'Does const guarantee an object cannot be modified?',a:'No. const prevents reassignment of the binding, not mutation of properties of the referenced object.'}],
+    say:'Hoisting describes declaration processing before execution. var is initialized to undefined; function declarations are usually callable; let and const are created but uninitialized in the TDZ. So I predict behavior by separating creation from the execution of assignments.'
+  },
+  this:{
+    intro:'The value of this in an ordinary function depends mainly on how the function is called. Arrow functions are different: they capture this from their surrounding lexical context.',
+    chapters:[
+      {heading:'1. Function call vs method call',paragraphs:[
+        'obj.show() is a method call: for a normal function, this is obj. But if you extract show into another variable, that call loses the obj receiver.',
+        'In strict mode, a standalone normal function call has this = undefined. In a non-strict standalone call, this can be substituted with the global object. Browser scripts, Node modules, and ES modules differ at top level, so avoid claiming top-level this is always window.',
+        'The function’s location alone does not determine this. The call expression often does.'
+      ],code:`'use strict';
+const user = {
+  name: 'Asha',
+  show() { return this.name; }
+};
+console.log(user.show()); // Asha
+const fn = user.show;
+// fn(); // TypeError: this is undefined in strict mode`,steps:['user.show() passes user as the method receiver.','Extracting the function creates a separate reference to the same function.','fn() is now a plain call with no receiver.','Under strict mode this is undefined, so accessing this.name throws.']},
+      {heading:'2. Arrow functions borrow this',paragraphs:[
+        'An arrow function does not have its own this, arguments, or prototype for use as a constructor. It captures this from the surrounding non-arrow execution context.',
+        'Use an arrow callback inside a method when you want to preserve the method’s this. Do not use an arrow as an object method that needs to receive the object as this.'
+      ],code:`const team = {
+  name: 'Frontend',
+  getMessage() {
+    const callback = () => this.name;
+    return callback();
+  },
+  // An arrow here would NOT bind this to team:
+  // bad: () => this.name
+};
+console.log(team.getMessage()); // Frontend`,steps:['getMessage is called through team, so this = team.','callback is an arrow created while getMessage runs.','The arrow captures this = team.','Calling callback returns team.name.']},
+      {heading:'3. Explicit binding and constructor calls',paragraphs:[
+        'call and apply immediately execute a normal function with an explicitly supplied this. bind returns a new function whose this is fixed for ordinary calls.',
+        'When calling a bound function with new, the new object takes priority as this. Arrow functions ignore attempts to override their lexical this using call, apply, or bind.',
+        'In a class constructor, this refers to the instance being created; derived class constructors must call super() before accessing this.'
+      ],code:`function greet(prefix) { return prefix + this.name; }
+const person = { name: 'Asha' };
+console.log(greet.call(person, 'Hi '));  // Hi Asha
+console.log(greet.apply(person, ['Hi '])); // Hi Asha
+const bound = greet.bind(person, 'Hello ');
+console.log(bound()); // Hello Asha`,steps:['call directly invokes greet with person as this.','apply does the same but receives an array-like arguments list.','bind creates a new callable function with person already fixed.','Invoking bound later still uses person.']},
+      {heading:'4. What to say about events and React',paragraphs:[
+        'For DOM listeners registered with addEventListener using a normal function, this commonly refers to currentTarget (unless using an arrow, where this remains lexical). Prefer event.currentTarget for clarity.',
+        'React function components have no component instance this. Use props, state, and closures. In legacy class components, methods often needed explicit binding or arrow class fields.'
+      ],code:`// Browser DOM example
+button.addEventListener('click', function (event) {
+  console.log(this === event.currentTarget); // true
+});
+button.addEventListener('click', (event) => {
+  console.log(event.currentTarget); // recommended explicit access
+});`,steps:['The first callback is a normal function invoked by the event system.','this is the event currentTarget for that listener invocation.','The arrow callback does not receive a new this.','event.currentTarget works for both styles.']}
+    ],visual:{title:'Determine this from the call site',frames:[{caption:'Normal method call',stack:['obj.method()'],detail:'this = obj.'},{caption:'Plain function call',stack:['const f = obj.method','f()'],detail:'In strict mode this = undefined.'},{caption:'Explicit invocation',stack:['f.call(obj)'],detail:'this = obj (for ordinary functions).'}, {caption:'Arrow callback',stack:['outer this','() => this'],detail:'The arrow captures this from the surrounding environment.'}]},
+    pitfalls:['Saying this always means the object where the function was defined.','Claiming an arrow inside an object automatically has this = that object.','Assuming all top-level environments have this = window.'],
+    questions:[{q:'Why does passing obj.method as a callback sometimes break it?',a:'The new caller invokes it without obj as its receiver. Use binding, a wrapper that calls obj.method(), or explicit context as appropriate.'},{q:'Can bind change an arrow function’s this?',a:'No. An arrow’s this is lexical and is not replaced by call, apply, or bind.'}],
+    say:'For regular functions, I determine this from the invocation: object method, plain call, explicit call/apply/bind, or construction. Arrow functions do not define their own this; they use the lexical this from the enclosing environment.'
+  },
+  'call-apply-bind':{
+    intro:'All three APIs control the this used by an ordinary function. call and apply invoke immediately; bind creates a function to invoke later. Understanding the distinction is a frequent JavaScript interview test.',
+    chapters:[
+      {heading:'1. Core differences with one function',paragraphs:[
+        'call(context, a, b) invokes immediately with comma-separated arguments. apply(context, [a, b]) invokes immediately with a single array-like collection of arguments. bind(context, a) returns a function and can partially apply arguments.',
+        'These methods do not permanently mutate the original function. bind creates a separate bound function. Calling call / apply / bind on an arrow cannot override the arrow’s lexical this.'
+      ],code:`function introduce(city, role) {
+  return this.name + ' works as ' + role + ' in ' + city;
+}
+const employee = { name: 'Sam' };
+console.log(introduce.call(employee, 'Mumbai', 'Engineer'));
+console.log(introduce.apply(employee, ['Mumbai', 'Engineer']));
+const inMumbai = introduce.bind(employee, 'Mumbai');
+console.log(inMumbai('Engineer'));
+// All return: Sam works as Engineer in Mumbai`,steps:['call executes the function with employee and two direct arguments.','apply executes it with the same context and an array of arguments.','bind returns a new function, storing employee and the first argument.','The resulting function runs later using its stored context.']},
+      {heading:'2. Partial application and borrowed methods',paragraphs:[
+        'bind can “pre-fill” the first arguments. This is called partial application and is useful for configuring a reusable function.',
+        'call lets you borrow methods from one object to use with another compatible object. This works because this is provided at invocation time for normal functions.'
+      ],code:`function multiply(a, b) { return a * b; }
+const double = multiply.bind(null, 2);
+console.log(double(8)); // 16
+
+const user = { first: 'Asha', last: 'Rao' };
+function fullName() { return this.first + ' ' + this.last; }
+console.log(fullName.call(user)); // Asha Rao`,steps:['bind stores the first argument 2 without running multiply yet.','double(8) supplies the remaining second argument.','fullName.call(user) borrows the function for user.']},
+      {heading:'3. Interview polyfill: implement your own call',paragraphs:[
+        'A common simplified interview exercise is implementing call using a temporary property on the target object. Use Symbol for a unique key and clean up in finally.',
+        'This is an educational approximation, not a specification-complete polyfill. Native call supports strict-mode functions with null / primitives as this, proxies, non-extensible objects, and other semantics that a temporary-property approach cannot faithfully reproduce.',
+        'Never modify Function.prototype in a production application just to demonstrate this exercise.'
+      ],code:`// Educational approximation (works with extensible objects):
+function myCall(fn, context, ...args) {
+  if (typeof fn !== 'function') throw new TypeError('fn');
+  const receiver = context == null ? globalThis : Object(context);
+  const key = Symbol('temporary');
+  receiver[key] = fn;
+  try {
+    return receiver[key](...args);
+  } finally {
+    delete receiver[key];
+  }
+}
+console.log(myCall(function (a) { return this.x + a; }, {x: 10}, 5));
+// 15`,steps:['Check that fn is callable.','Choose a receiver and assign fn to a temporary Symbol property.','Calling receiver[key](...) gives a normal function the receiver as this.','finally removes the temporary property even if fn throws.','Explain the approximation’s limitations to the interviewer.']},
+      {heading:'4. Interview polyfill: apply and bind',paragraphs:[
+        'apply differs from call only in how arguments are supplied. For a simple exercise, convert the argument collection to an array and delegate to myCall.',
+        'A basic bind returns a closure that saves the receiver and pre-filled arguments. Production-accurate bind must additionally handle new, prototype behavior, function metadata, and bound-this precedence.',
+        'For a serious interview, state which spec behaviors your simplified polyfill intentionally does not support.'
+      ],code:`// Demonstration only; depends on educational myCall above.
+function myApply(fn, context, args = []) {
+  return myCall(fn, context, ...Array.from(args));
+}
+function myBind(fn, context, ...preset) {
+  return function (...later) {
+    return myCall(fn, context, ...preset, ...later);
+  };
+}
+const add = function (x, y) { return this.base + x + y; };
+console.log(myApply(add, {base: 5}, [2, 3])); // 10
+const configured = myBind(add, {base: 5}, 2);
+console.log(configured(3)); // 10`,steps:['myApply expands the supplied collection.','myBind stores context and preset in its closure.','Calling the bound wrapper adds later arguments.','This simplified bind is not constructor-safe; native bind has additional new semantics.']}
+    ],visual:{title:'call vs apply vs bind',frames:[{caption:'call',stack:['fn.call(obj, a, b)','execute now'],detail:'Comma-separated arguments; immediate result.'},{caption:'apply',stack:['fn.apply(obj, [a,b])','execute now'],detail:'Array-like arguments; immediate result.'},{caption:'bind',stack:['fn.bind(obj, a)','return wrapper'],detail:'No immediate execution; returns a new function.'},{caption:'Invoke bound function',stack:['bound(b)','execute now'],detail:'Runs later with bound receiver and preset arguments.'}]},
+    pitfalls:['Calling bind and expecting the original function to run immediately.','Using apply with multiple positional arguments instead of an array-like argument list.','Presenting a Symbol-property implementation as a 100% spec-correct native polyfill.'],
+    questions:[{q:'What happens if you call a bound function with call(otherObj)?',a:'For normal calls, the existing bound this takes priority; call cannot replace it.'},{q:'What if a bound function is used with new?',a:'Native bound functions can act as constructors when the target is constructable. The new object supplies this; a simplistic closure-based polyfill does not reproduce this correctly.'}],
+    say:'call invokes a function now with positional arguments; apply invokes now with an array-like collection; bind returns a new function for later and can preset arguments. I can implement educational approximations with closures and explain why truly spec-correct polyfills are more complex.'
+  },
+  prototypes:{
+    intro:'Objects can delegate missing property lookups to another object through their internal [[Prototype]] link. This is the core of JavaScript’s prototypal inheritance.',
+    chapters:[
+      {heading:'1. Understand the prototype lookup chain',paragraphs:[
+        'When you read obj.value, JavaScript checks whether obj has its own property value. If not, it follows its [[Prototype]] to the next object and repeats. Lookup stops at a match or at null.',
+        'Object.getPrototypeOf(obj) reads the object’s actual prototype. Avoid depending on __proto__ in new code; use Object.getPrototypeOf and Object.setPrototypeOf (or better, Object.create during construction).',
+        'A missing property is undefined when read, but a lookup may also trigger getters on the chain.'
+      ],code:`const parent = { greet() { return 'Hello'; } };
+const child = Object.create(parent);
+child.name = 'Sam';
+console.log(child.name);              // Sam (own property)
+console.log(child.greet());           // Hello (inherited)
+console.log(Object.hasOwn(child, 'greet')); // false
+console.log(Object.getPrototypeOf(child) === parent); // true`,steps:['Look for name on child; found immediately.','Look for greet on child; not found.','Move to parent; find greet and call it.','The method call child.greet() uses child as this for a normal method.']},
+      {heading:'2. Shadowing and inherited methods',paragraphs:[
+        'If an object has its own property with the same name as a prototype property, the own property shadows the inherited property.',
+        'Prototype methods are shared between objects that link to that prototype. Putting methods on a constructor prototype avoids creating a separate function for every instance.',
+        'Use Object.hasOwn when you need to distinguish an object’s own fields from inherited ones.'
+      ],code:`const animal = { sound: 'unknown', speak() { return this.sound; } };
+const dog = Object.create(animal);
+dog.sound = 'woof';
+console.log(dog.speak()); // woof
+console.log(Object.hasOwn(dog, 'speak')); // false
+console.log(Object.hasOwn(dog, 'sound')); // true`,steps:['speak is found on animal, not dog.','The receiver of dog.speak() is dog.','Inside speak, this.sound resolves to dog.sound = woof.','The method is inherited but still operates on dog.']},
+      {heading:'3. Constructor function and .prototype',paragraphs:[
+        'Normal constructor functions have a prototype property used by new when creating instances. Do not confuse FunctionName.prototype with Object.getPrototypeOf(FunctionName): they are different links.',
+        'The new operator creates a fresh object, links it to Constructor.prototype (if appropriate), calls the constructor with that object as this, and ordinarily returns the new object unless the constructor returns an object explicitly.'
+      ],code:`function Person(name) { this.name = name; }
+Person.prototype.greet = function () {
+  return 'Hi ' + this.name;
+};
+const a = new Person('Asha');
+const b = new Person('Sam');
+console.log(a.greet()); // Hi Asha
+console.log(a.greet === b.greet); // true
+console.log(Object.getPrototypeOf(a) === Person.prototype); // true`,steps:['new creates a new object linked to Person.prototype.','Person assigns name to the new instance.','greet is found on the shared prototype.','Both instances reference the same greet function.']},
+      {heading:'4. Object.create and Object.prototype',paragraphs:[
+        'Object.create(proto) makes a new object whose [[Prototype]] is exactly proto (the optional second parameter can define properties).',
+        'Many ordinary object literals eventually delegate to Object.prototype. But Object.create(null) makes a dictionary-like object with no prototype chain and no inherited toString method.',
+        'Prototype changes can hurt engine optimization. Prefer creating objects with their desired prototype up front.'
+      ],code:`const dictionary = Object.create(null);
+dictionary.answer = 42;
+console.log(Object.getPrototypeOf(dictionary)); // null
+console.log(dictionary.toString); // undefined
+
+const base = { role: 'Engineer' };
+const profile = Object.create(base);
+console.log(profile.role); // Engineer`,steps:['dictionary has a null prototype and no inherited Object.prototype methods.','profile links directly to base.','The role lookup follows profile → base.']}
+    ],visual:{title:'Property lookup through prototypes',frames:[{caption:'Look for greet',stack:['child'],detail:'Property not found on child.'},{caption:'Follow [[Prototype]]',stack:['parent','child'],detail:'Lookup moves to the prototype parent.'},{caption:'Found inherited method',stack:['parent.greet()','child'],detail:'Method found. Call receiver is still child.'},{caption:'If still missing',stack:['Object.prototype','null'],detail:'Continue toward null; undefined is returned if no matching property exists.'}]},
+    pitfalls:['Confusing obj.prototype with the object’s internal [[Prototype]].','Claiming inherited methods always use the parent object as this.','Using for...in without thinking about inherited enumerable properties.'],
+    questions:[{q:'What is the difference between in and Object.hasOwn?',a:'in tests the object and its prototype chain; Object.hasOwn only checks the object’s own properties.'},{q:'What does Object.create(null) change?',a:'It creates an object with no prototype, so it has no inherited Object.prototype members.'}],
+    say:'JavaScript uses prototype delegation. Property lookup checks an object first, then follows [[Prototype]] links until it finds a property or reaches null. Object.create sets that link, and constructor instances typically inherit shared methods from Constructor.prototype.'
+  },
+  'classes-prototypes':{
+    intro:'JavaScript class syntax is built on the same prototype model, not a separate class-based object system. Classes add clearer syntax, useful semantics, and additional features such as private fields.',
+    chapters:[
+      {heading:'1. Translate class syntax to prototype syntax',paragraphs:[
+        'A class declaration defines a constructor function whose ordinary instance methods are placed on its prototype. Instances link to that prototype through [[Prototype]].',
+        'Unlike ordinary function declarations, class declarations are in the TDZ until evaluated. Class bodies execute in strict mode. Class constructors cannot be called without new.',
+        'Methods written as regular class methods are shared on the prototype; arrow function fields are instance properties and therefore not shared the same way.'
+      ],code:`class Person {
+  constructor(name) { this.name = name; }
+  greet() { return 'Hi ' + this.name; }
+}
+const a = new Person('Asha');
+const b = new Person('Sam');
+console.log(a.greet === b.greet); // true
+console.log(Object.getPrototypeOf(a) === Person.prototype); // true`,steps:['class defines Person and its prototype greet method.','new Person creates an instance linked to Person.prototype.','constructor initializes name on that instance.','greet is found on the shared prototype.']},
+      {heading:'2. Rough prototype equivalent',paragraphs:[
+        'Conceptually you can write the previous example with a constructor function and method on its prototype. This illustrates the storage and lookup model, but the semantics are not identical in every detail.',
+        'Notable differences include mandatory new for classes, non-enumerable class methods, TDZ behavior, strict-mode class body execution, private field syntax, and extends/super rules.'
+      ],code:`function PersonOld(name) { this.name = name; }
+PersonOld.prototype.greet = function () {
+  return 'Hi ' + this.name;
+};
+const p = new PersonOld('Asha');
+console.log(p.greet()); // Hi Asha`,steps:['The constructor initializes each instance.','The greet method is stored once on PersonOld.prototype.','Every constructed instance can look up greet through its prototype chain.']},
+      {heading:'3. extends, super, and chain lookup',paragraphs:[
+        'extends links the child constructor/prototype relationships to the parent so that instances can inherit methods. super() calls the base constructor in a derived class; it must run before the derived constructor uses this.',
+        'Overriding a method defines a nearer method on the child prototype. super.method() allows a subclass method to delegate to the parent implementation.'
+      ],code:`class Animal {
+  constructor(name) { this.name = name; }
+  speak() { return this.name + ' makes a sound'; }
+}
+class Dog extends Animal {
+  speak() { return super.speak() + ' (woof)'; }
+}
+const dog = new Dog('Rex');
+console.log(dog.speak()); // Rex makes a sound (woof)
+console.log(dog instanceof Animal); // true`,steps:['Dog inherits the constructor behavior because it has no explicit constructor.','dog.speak finds Dog.prototype.speak first.','super.speak calls the parent method with dog as this.','instanceof checks whether Animal.prototype appears in dog’s prototype chain.']},
+      {heading:'4. Private fields vs closure privacy',paragraphs:[
+        '#count is a real language-enforced private field; it is not simply a property name you can access with bracket notation.',
+        'Closures can also provide privacy by keeping a variable inaccessible except through returned functions. The approaches differ in where state lives: a closure environment vs per-instance private fields.',
+        'Class syntax is often better for objects with shared behavior; closures are excellent for small factories and functions that need retained state.'
+      ],code:`class Counter {
+  #count = 0;
+  increment() { return ++this.#count; }
+  value() { return this.#count; }
+}
+const c = new Counter();
+console.log(c.increment()); // 1
+// c.#count  // SyntaxError: private outside class`,steps:['The class declares a private #count field for each instance.','increment and value are shared prototype methods.','External code cannot directly access #count.']}
+    ],visual:{title:'How class instances resolve methods',frames:[{caption:'Create instance',stack:['new Dog()','dog instance'],detail:'dog is initialized with Dog.prototype in its chain.'},{caption:'Find dog.speak',stack:['dog instance','Dog.prototype'],detail:'Dog.prototype.speak is the closest match.'},{caption:'super.speak()',stack:['Dog.prototype','Animal.prototype'],detail:'The override delegates to the parent implementation.'},{caption:'Reach Object.prototype',stack:['Dog.prototype','Animal.prototype','Object.prototype'],detail:'The chain ultimately terminates at null.'}]},
+    pitfalls:['Saying classes replace the prototype system.','Assuming all class members are shared on the prototype (instance fields are not).','Calling a class constructor as a regular function.'],
+    questions:[{q:'What does class syntax add beyond a constructor function?',a:'Clearer method definitions, extends/super, private fields, static members, strict-mode behavior, and other specific semantics. The object delegation mechanism still uses prototypes.'},{q:'Why would arrow instance methods use more memory?',a:'Each instance gets its own function object, whereas a regular prototype method is shared by instances.'}],
+    say:'JavaScript classes are syntax and semantics built on prototypes. new makes an instance linked to Class.prototype, normal methods live on that shared prototype, and extends sets up prototype inheritance. Classes add features such as super and private fields but do not replace prototype lookup.'
+  },
+  'event-loop':{
+    intro:'JavaScript can run synchronous code on one main thread while the host environment manages timers, network callbacks, and rendering. The event loop decides when queued jobs get to run.',
+    chapters:[
+      {heading:'1. Call stack, host APIs, tasks, and microtasks',paragraphs:[
+        'Synchronous JavaScript runs immediately on the call stack. Timers and other host operations arrange for callbacks to run later; setTimeout does not pause your current function.',
+        'Promise reactions and queueMicrotask schedule microtasks. Timer callbacks typically enter a task queue. Once the current task finishes, the host performs a microtask checkpoint: it processes the microtask queue before moving on to another task.',
+        'The exact scheduling of rendering is controlled by the browser. Rendering opportunities often occur between tasks after microtasks drain, but you should not claim that every task always produces a paint.'
+      ],code:`console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+// A D C B`,steps:['Log A synchronously.','Timer callback B is scheduled as a later task.','Promise reaction C enters the microtask queue.','Log D synchronously.','After the current stack completes, run microtask C.','Later, run timer task B.']},
+      {heading:'2. Output prediction with nested microtasks',paragraphs:[
+        'Microtasks created while draining microtasks are also processed before the event loop moves on. This is why a long chain of microtasks can postpone later tasks and painting.',
+        'Predict output by writing three lists: synchronous statements, microtasks, and tasks. Update the queues whenever a running callback schedules another callback.'
+      ],code:`console.log('start');
+setTimeout(() => console.log('timer'), 0);
+Promise.resolve().then(() => {
+  console.log('promise 1');
+  queueMicrotask(() => console.log('microtask 2'));
+});
+queueMicrotask(() => console.log('microtask 1'));
+console.log('end');
+// start, end, promise 1, microtask 1, microtask 2, timer`,steps:['Synchronous: print start, schedule timer, schedule promise 1, schedule microtask 1, print end.','Microtasks initially: [promise 1, microtask 1].','Run promise 1 and enqueue microtask 2 at the end.','Run microtask 1, then microtask 2.','The timer task executes after the microtask queue is empty.']},
+      {heading:'3. async/await is built around promises',paragraphs:[
+        'An async function starts synchronously until an await (or return/throw) changes how its work proceeds. Awaited continuation runs asynchronously through promise jobs—even if the awaited value is already available.',
+        'await does not block the entire JavaScript thread while waiting. It pauses the async function and allows other work to run.'
+      ],code:`async function run() {
+  console.log('1');
+  await Promise.resolve();
+  console.log('3');
+}
+run();
+console.log('2');
+// 1, 2, 3`,steps:['Calling run executes synchronously until await; print 1.','Await schedules the continuation after the promise settles.','Outside run, print 2 immediately.','The continuation runs as a microtask and prints 3.']},
+      {heading:'4. requestAnimationFrame and rendering',paragraphs:[
+        'requestAnimationFrame callbacks run before a browser repaints, at a rendering opportunity. Use it for visual updates tied to frames rather than treating setTimeout(0) as a guaranteed paint boundary.',
+        'Large synchronous loops block interactions and delay frames. Splitting long work into smaller tasks or using a Worker can improve responsiveness.',
+        'The event loop model differs across browser and Node.js environments; Node adds phases and process.nextTick behavior. Confirm the target runtime before predicting exotic schedules.'
+      ],code:`// Browser example:
+console.log('sync');
+requestAnimationFrame(() => console.log('before paint callback'));
+queueMicrotask(() => console.log('microtask'));
+// Guaranteed relative order of immediate logs here:
+// sync, microtask; rAF runs at a later rendering opportunity.`,steps:['The synchronous log runs first.','A rendering callback is requested, not immediately executed.','The microtask runs after the current stack completes.','When a rendering opportunity occurs, rAF runs before the associated paint.']}
+    ],visual:{title:'Queue ordering in the event loop',frames:[{caption:'Run current script',stack:['Call stack: script'],detail:'Synchronous logs run immediately.'},{caption:'Schedule callbacks',stack:['Task queue: timer','Microtask queue: promise'],detail:'The timer and promise reactions are waiting.'},{caption:'Stack is empty',stack:['Microtask queue: promise'],detail:'Run the promise microtask before the next timer task.'},{caption:'Microtasks finished',stack:['Task queue: timer'],detail:'Browser may render at an opportunity, then continue to another task.'},{caption:'Timer runs',stack:['Call stack: timer callback'],detail:'The timer callback logs its result in a later task.'}]},
+    pitfalls:['Assuming setTimeout(fn, 0) runs before Promise.then because zero means immediate.','Thinking await blocks all JavaScript until the promise settles.','Saying the browser paints after every task no matter what.'],
+    questions:[{q:'Can microtasks starve rendering?',a:'Yes. If microtasks keep scheduling more microtasks, the event loop may delay tasks and rendering opportunities.'},{q:'What runs first: Promise.then or setTimeout(..., 0)?',a:'After the current task finishes, pending microtasks are processed before moving to a timer task (in the usual browser event-loop example).'}],
+    say:'The call stack executes synchronous code. The browser handles timers and other external work; callbacks are queued. After a task completes, promise/queueMicrotask jobs run before the next task, and rendering happens at suitable browser opportunities. I predict output by tracing stack, microtasks, and tasks separately.'
+  }
+};
+
+

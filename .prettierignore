@@ -1,0 +1,9 @@
+node_modules
+.next
+public/legacy
+app.js
+curriculum.js
+deep-dive.js
+styles.css
+package-lock.json
+src/content/*.json
