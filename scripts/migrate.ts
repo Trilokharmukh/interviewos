@@ -1,5 +1,9 @@
 import nextEnv from "@next/env";
 nextEnv.loadEnvConfig(process.cwd());
+// Migrations use a direct connection; application traffic stays pooled.
+if (process.env.DATABASE_URL_UNPOOLED) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL_UNPOOLED;
+}
 const { getAuth } = await import("../src/lib/auth");
 const { getPool } = await import("../src/lib/db");
 const { getMigrations } = await import("better-auth/db/migration");
