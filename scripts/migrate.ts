@@ -1,5 +1,5 @@
-import { loadEnvConfig } from "@next/env";
-loadEnvConfig(process.cwd());
+import nextEnv from "@next/env";
+nextEnv.loadEnvConfig(process.cwd());
 const { getAuth } = await import("../src/lib/auth");
 const { getPool } = await import("../src/lib/db");
 const { getMigrations } = await import("better-auth/db/migration");
