@@ -39,7 +39,17 @@ const payloadSchema = z.object({
 export async function PUT(request: Request) {
   // The session is the sole source of user identity. Reject cross-origin writes.
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin)
+  const requestUrl = new URL(request.url);
+  // Next.js can expose an internal URL behind a proxy. Production uses the
+  // configured auth origin; otherwise compare against the routed Host header.
+  const protocol =
+    request.headers.get("x-forwarded-proto") === "https"
+      ? "https:"
+      : requestUrl.protocol;
+  const expectedOrigin = process.env.BETTER_AUTH_URL
+    ? new URL(process.env.BETTER_AUTH_URL).origin
+    : `${protocol}//${request.headers.get("host") ?? requestUrl.host}`;
+  if (!origin || origin !== expectedOrigin)
     return Response.json({ error: "Invalid origin." }, { status: 403 });
   if (Number(request.headers.get("content-length") || 0) > 2_000_000)
     return Response.json({ error: "Backup exceeds 2 MB." }, { status: 413 });

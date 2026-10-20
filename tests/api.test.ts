@@ -47,3 +47,19 @@ test("device-only deployments accurately report cloud accounts as unavailable", 
     accounts: false,
   });
 });
+
+test("routed same-origin writes work behind a TLS proxy while requiring a session", async () => {
+  const response = await putStudy(
+    new Request("http://localhost:3000/api/study", {
+      method: "PUT",
+      headers: {
+        host: "interviewos.test",
+        "x-forwarded-proto": "https",
+        origin: "https://interviewos.test",
+        "content-type": "application/json",
+      },
+      body: "{}",
+    }),
+  );
+  assert.equal(response.status, 401);
+});
